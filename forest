@@ -1,0 +1,133 @@
+#!/usr/bin/env python
+#
+#  forest
+#  
+#  Created by Dan Preston on 12/22/08.
+#
+#  A utility to manage a suite of related git repositories.
+#
+
+from __future__ import with_statement
+import sys, commands, os
+from optparse import OptionParser
+
+kToolName		= "forest"
+kVersion		= " version 1.0"
+
+gRepositories	= {}
+
+#----------------------------------------------------------------------------------------------------------------------------
+# ReadConfigFile
+#----------------------------------------------------------------------------------------------------------------------------
+
+def	ReadConfigFile( config = ".forest/forest.conf" ):
+	section = "global"
+	with open( config, 'r' ) as f:
+		lmark = '[project "'
+		rmark = '"]'
+		
+		for line in f:
+			line = line.strip()
+			if line.startswith( lmark ) and line.endswith( rmark ):
+				section = line[len(lmark):-len(rmark)]
+				gRepositories[section] = {}
+			elif line.startswith("#"):
+				continue
+			elif line.startswith( ";" ):
+				continue
+			elif line == "":
+				continue
+			else:
+				key, _, value = line.partition("=")
+				if value == None:
+					sys.exit(-2)
+				key = key.strip()
+				value = value.strip()
+				gRepositories[section][key] = value
+	
+	print gRepositories
+
+#----------------------------------------------------------------------------------------------------------------------------
+# ProcessCommand_init
+#----------------------------------------------------------------------------------------------------------------------------
+def	ProcessCommand_init( repository ):
+	print( "init!" )
+	# Clone the git repository containing the meta data.
+	
+	print( "Getting forest meta data from %s..." % repository );
+	command = "git clone " + repository + " .forest 2>&1"
+	err, output = commands.getstatusoutput( command )
+	if err != 0:
+		sys.exit( err )
+	print( "done\n" );
+	
+	ReadConfigFile();
+
+#----------------------------------------------------------------------------------------------------------------------------
+# ProcessCommand_pull
+#----------------------------------------------------------------------------------------------------------------------------
+def	ProcessCommand_pull():
+	ReadConfigFile()
+	
+	for key, section in gRepositories.items():
+		path = section["path"]
+		if path == None:
+			print( "No path for section: " + key )
+			sys.exit( -2 )
+		fullpath = os.path.join( path, ".git" )
+		
+		# clone the path if we don't have it yet, otherwise just pull.
+		if os.path.exists( fullpath ) == False:
+			url = section["url"]
+			print( "Cloning '%s' -> '%s'..." % (url, path) )
+			command = "git clone %s %s 2>&1" % (url, path)
+			err, output = commands.getstatusoutput( command )
+			print( output )
+			if err != 0:
+				sys.exit( err )
+			print( "done\n" )
+		else:
+			os.chdir( path )
+			command = "git pull 2>&1"
+			err, output = commands.getstatusoutput( command )
+			print( output )
+			if err != 0:
+				sys.exit( err )
+			os.chdir( ".." )
+
+#----------------------------------------------------------------------------------------------------------------------------
+#	main
+#----------------------------------------------------------------------------------------------------------------------------
+
+def main( argv=None ):
+	if argv is None:
+		argv = sys.argv
+	
+	# Set up options for the command line that we support.
+	description="A utility to manage a suite of related git repositories."
+	usage = '''Usage: forest COMMAND [command options]
+
+    init    Initializes a forest.
+    pull    Pulls the latest changes from a forest.
+    push    Pushes your local commits to the forest.
+    stat    Gets status for all the repositories in the local forest.
+    tag     Tags a forest.'''
+	
+	parser = OptionParser(version=kVersion, description=description, usage=usage)
+	parser.add_option( "--init", dest="repository", help="Pass the git repository holding the manifest file." )
+	parser.add_option( "--pull", action="store_true", dest="pull", help="Pull the latest changes from the git repositories managed by the forest manifest." )
+	parser.add_option( "--push", action="store_true", dest="push", help="Push local modifications in the local forest to their respective git origins." )
+	parser.add_option( "--stat", action="store_true", dest="status", help="Print the status of the local forest." )
+	parser.add_option( "--tag", dest="tag", help="Create a tag to be applied across all of the individual git repositories in the forest." )
+	
+	( options, args ) = parser.parse_args( argv[1:] )
+	
+	if options.repository:
+		ProcessCommand_init( options.repository )
+	elif options.pull:
+		ProcessCommand_pull()
+	
+	return 0
+
+if __name__ == "__main__":
+	sys.exit(main())
