@@ -9,10 +9,9 @@
 
 from __future__ import with_statement
 import sys, commands, os
-from optparse import OptionParser
 
 kToolName		= "forest"
-kVersion		= " version 1.0"
+kVersion		= " 1.0"
 
 gRepositories	= {}
 
@@ -44,29 +43,82 @@ def	ReadConfigFile( config = ".forest/forest.conf" ):
 				key = key.strip()
 				value = value.strip()
 				gRepositories[section][key] = value
+
+#----------------------------------------------------------------------------------------------------------------------------
+# ProcessCommand_help
+#----------------------------------------------------------------------------------------------------------------------------
+
+def ProcessCommand_help( helpArgs=None ):
+	description="A utility to manage a suite of related git repositories."
+	usage = '''Usage: forest COMMAND [command options]
+
+    help    Print out the help for a given command.
+    init    Initializes a forest.
+    config  Set configuration options on a forest.
+    pull    Pulls the latest changes from a forest.
+    push    Pushes your local commits to the forest.
+    stat    Gets status for all the repositories in the forest.
+    tag     Tags a forest.'''
 	
-	print gRepositories
+	print( kToolName + kVersion + ": " + description + "\n" )
+	print( usage )
 
 #----------------------------------------------------------------------------------------------------------------------------
 # ProcessCommand_init
 #----------------------------------------------------------------------------------------------------------------------------
-def	ProcessCommand_init( repository ):
-	print( "init!" )
-	# Clone the git repository containing the meta data.
-	
-	print( "Getting forest meta data from %s..." % repository );
-	command = "git clone " + repository + " .forest 2>&1"
-	err, output = commands.getstatusoutput( command )
-	if err != 0:
-		sys.exit( err )
-	print( "done\n" );
-	
-	ReadConfigFile();
 
+def	ProcessCommand_init( initArgs ):
+	if len(initArgs) != 1:
+		ProcessCommand_help( "init" )
+		sys.exit( -2 )
+	
+	repository = initArgs[0]
+	
+	if os.path.exists( ".forest" ):
+		print( "The .forest folder already exists from a previous init." )
+	else:
+		# Clone the git repository containing the meta data.
+		print( "Getting forest meta data from %s..." % repository );
+		command = "git clone " + repository + " .forest 2>&1"
+		err, output = commands.getstatusoutput( command )
+		if err != 0:
+			print( "git clone failed! [error %d]" % err )
+			sys.exit( err )
+		print( "done\n" );
+	
+		ReadConfigFile()
+
+#----------------------------------------------------------------------------------------------------------------------------
+# ProcessCommand_config
+#----------------------------------------------------------------------------------------------------------------------------
+
+def ProcessCommand_config( configArgs ):
+	nargs = len( configArgs )
+	
+	ReadConfigFile()
+	
+	if (nargs < 1) or (nargs > 2):
+		ProcessCommand_help( "config" )
+		sys.exit( -2 )
+	
+	section, _, key = configArgs[0].partition(".")
+	if nargs == 1:
+		if section in gRepositories:
+			if key in gRepositories[section]:
+				print( gRepositories[section][key] )
+	elif nargs == 2:
+		if section in gRepositories:
+			gRepositories[section][key] = configArgs[1]
+		else:
+			gRepositories[section] = {}
+			gRepositories[section][key] = configArgs[1]
+	
+	
 #----------------------------------------------------------------------------------------------------------------------------
 # ProcessCommand_pull
 #----------------------------------------------------------------------------------------------------------------------------
-def	ProcessCommand_pull():
+
+def	ProcessCommand_pull( pullArgs ):
 	ReadConfigFile()
 	
 	for key, section in gRepositories.items():
@@ -96,6 +148,15 @@ def	ProcessCommand_pull():
 			os.chdir( ".." )
 
 #----------------------------------------------------------------------------------------------------------------------------
+#	ProcessCommand_error
+#----------------------------------------------------------------------------------------------------------------------------
+
+def ProcessCommand_error( errorArgs ):
+	if errorArgs:
+		print( 'Invalid command: "%s"' % errorArgs[0] )
+	ProcessCommand_help()
+
+#----------------------------------------------------------------------------------------------------------------------------
 #	main
 #----------------------------------------------------------------------------------------------------------------------------
 
@@ -104,28 +165,22 @@ def main( argv=None ):
 		argv = sys.argv
 	
 	# Set up options for the command line that we support.
-	description="A utility to manage a suite of related git repositories."
-	usage = '''Usage: forest COMMAND [command options]
-
-    init    Initializes a forest.
-    pull    Pulls the latest changes from a forest.
-    push    Pushes your local commits to the forest.
-    stat    Gets status for all the repositories in the local forest.
-    tag     Tags a forest.'''
-	
-	parser = OptionParser(version=kVersion, description=description, usage=usage)
-	parser.add_option( "--init", dest="repository", help="Pass the git repository holding the manifest file." )
-	parser.add_option( "--pull", action="store_true", dest="pull", help="Pull the latest changes from the git repositories managed by the forest manifest." )
-	parser.add_option( "--push", action="store_true", dest="push", help="Push local modifications in the local forest to their respective git origins." )
-	parser.add_option( "--stat", action="store_true", dest="status", help="Print the status of the local forest." )
-	parser.add_option( "--tag", dest="tag", help="Create a tag to be applied across all of the individual git repositories in the forest." )
-	
-	( options, args ) = parser.parse_args( argv[1:] )
-	
-	if options.repository:
-		ProcessCommand_init( options.repository )
-	elif options.pull:
-		ProcessCommand_pull()
+	if   "help"   == argv[1]:
+		ProcessCommand_help( argv[2:] )
+	elif "init"   == argv[1]:
+		ProcessCommand_init( argv[2:] )
+	elif "config" == argv[1]:
+		ProcessCommand_config( argv[2:] )
+	elif "pull"   == argv[1]:
+		ProcessCommand_pull( argv[2:] )
+	elif "push"   == argv[1]:
+		ProcessCommand_push( argv[2:] )
+	elif "stat"   == argv[1]:
+		ProcessCommand_stat( argv[2:] )
+	elif "tag"    == argv[1]:
+		ProcessCommand_tag( argv[2:] )
+	else:
+		ProcessCommand_error( argv[1:] )
 	
 	return 0
 
