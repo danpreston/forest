@@ -93,13 +93,18 @@ def	ProcessCommand_init( initArgs ):
 #----------------------------------------------------------------------------------------------------------------------------
 
 def ProcessCommand_config( configArgs ):
-	nargs = len( configArgs )
-	
 	ReadConfigFile()
 	
+	nargs = len( configArgs )
 	if (nargs < 1) or (nargs > 2):
 		ProcessCommand_help( "config" )
 		sys.exit( -2 )
+	
+	if configArgs[0] == "list":
+		for section, sectionDicts in gRepositories.items():
+			print( section )
+			for key, value in sectionDicts.items():
+				print( "        %s = %s" % (key, value) )
 	
 	section, _, key = configArgs[0].partition(".")
 	if nargs == 1:
@@ -107,12 +112,25 @@ def ProcessCommand_config( configArgs ):
 			if key in gRepositories[section]:
 				print( gRepositories[section][key] )
 	elif nargs == 2:
-		if section in gRepositories:
-			gRepositories[section][key] = configArgs[1]
-		else:
-			gRepositories[section] = {}
-			gRepositories[section][key] = configArgs[1]
-	
+		sectionLine = '[project "%s"]\n' % section
+		keyLine = '        %s = %s\n' % (key, configArgs[1])
+		
+		sectionFound = False
+		with open( ".forest/forest.conf", "r" ) as f:
+			lines = f.readlines()
+			for i in range( len( lines ) ):
+				line = lines[i]
+				if line.startswith( sectionLine ):
+					lines.insert( i+1, keyLine )
+					sectionFound = True
+		
+			if not sectionFound:
+				lines.append( sectionLine )
+				lines.append( keyLine )
+			
+		with open( ".forest/forest.conf", "w" ) as f:
+			f.writelines( lines )
+			f.flush()
 	
 #----------------------------------------------------------------------------------------------------------------------------
 # ProcessCommand_pull
@@ -121,31 +139,54 @@ def ProcessCommand_config( configArgs ):
 def	ProcessCommand_pull( pullArgs ):
 	ReadConfigFile()
 	
-	for key, section in gRepositories.items():
-		path = section["path"]
-		if path == None:
-			print( "No path for section: " + key )
-			sys.exit( -2 )
-		fullpath = os.path.join( path, ".git" )
-		
-		# clone the path if we don't have it yet, otherwise just pull.
-		if os.path.exists( fullpath ) == False:
-			url = section["url"]
-			print( "Cloning '%s' -> '%s'..." % (url, path) )
-			command = "git clone %s %s 2>&1" % (url, path)
-			err, output = commands.getstatusoutput( command )
-			print( output )
-			if err != 0:
-				sys.exit( err )
-			print( "done\n" )
-		else:
-			os.chdir( path )
-			command = "git pull 2>&1"
-			err, output = commands.getstatusoutput( command )
-			print( output )
-			if err != 0:
-				sys.exit( err )
-			os.chdir( ".." )
+	fullPath = None
+	for sectionName, section in gRepositories.items():
+		if "path" in section:
+			path = section["path"]
+			if path == None:
+				print( "No path for section: " + sectionName )
+				sys.exit( -2 )
+			fullpath = os.path.join( path, ".git" )
+			
+			# clone the path if we don't have it yet, otherwise just pull.
+			if os.path.exists( fullpath ) == False:
+				url = urlForSection( sectionName )
+				print( "Cloning '%s' -> '%s'..." % (url, path) )
+				command = "git clone %s %s 2>&1" % (url, path)
+				err, output = commands.getstatusoutput( command )
+				print( output )
+				if err != 0:
+					sys.exit( err )
+				print( "done\n" )
+			else:
+				os.chdir( path )
+				print( 'Updating "%s"' % path )
+				command = "git pull 2>&1"
+				err, output = commands.getstatusoutput( command )
+				print( output )
+				if err != 0:
+					sys.exit( err )
+				os.chdir( ".." )
+
+#----------------------------------------------------------------------------------------------------------------------------
+#	urlForSection
+#----------------------------------------------------------------------------------------------------------------------------
+
+def urlForSection( section ):
+	user = None
+	if "user" in gRepositories[section]:
+		user = gRepositories["user"]
+	elif "global" in gRepositories and "user" in gRepositories["global"]:
+		user = gRepositories["global"]["user"]
+	
+	# inject the user name into the url.
+	url = gRepositories[section]["url"]
+	if user:
+		left, seperator, address = url.partition("://")
+		if seperator and url.find("@") == -1:
+			url = left + seperator + user + "@" + address
+	
+	return url
 
 #----------------------------------------------------------------------------------------------------------------------------
 #	ProcessCommand_error
