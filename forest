@@ -188,11 +188,34 @@ def ProcessCommand_foreach( forEachArgs ):
 			os.chdir(current)
 
 #----------------------------------------------------------------------------------------------------------------------------
+# ProcessCommand_push
+#----------------------------------------------------------------------------------------------------------------------------
+
+def ProcessCommand_push( pushArgs ):
+	if pushArgs:
+		ProcessCommand_help( "push" )
+		sys.exit(-2)
+	ProcessCommand_foreach( ["git push"] )
+
+#----------------------------------------------------------------------------------------------------------------------------
 # ProcessCommand_status
 #----------------------------------------------------------------------------------------------------------------------------
 
 def ProcessCommand_status( statusArgs ):
+	if statusArgs:
+		ProcessCommand_help( "status" )
+		sys.exit(-2)
 	ProcessCommand_foreach( ["git status"] )
+
+#----------------------------------------------------------------------------------------------------------------------------
+# ProcessCommand_tag
+#----------------------------------------------------------------------------------------------------------------------------
+
+def ProcessCommand_tag( tagArgs ):
+	if len( tagArgs ) != 1:
+		ProcessCommand_help( "tag" )
+		sys.exit(-2)
+	ProcessCommand_foreach( ["git tag %s" % tagArgs[0]] )
 
 #----------------------------------------------------------------------------------------------------------------------------
 # ProcessCommand_pull
@@ -216,7 +239,7 @@ def	ProcessCommand_pull( pullArgs ):
 				print( "Cloning '%s' -> '%s'..." % (url, path) )
 				command = "git clone %s %s 2>&1" % (url, path)
 				err, output = commands.getstatusoutput( command )
-				print( output )
+				print( output + "\n" )
 				if err != 0:
 					sys.exit( err )
 				print( "done\n" )
@@ -225,7 +248,7 @@ def	ProcessCommand_pull( pullArgs ):
 				print( 'Updating "%s"' % path )
 				command = "git pull 2>&1"
 				err, output = commands.getstatusoutput( command )
-				print( output )
+				print( output + "\n" )
 				if err != 0:
 					sys.exit( err )
 				os.chdir( ".." )
