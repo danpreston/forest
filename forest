@@ -120,7 +120,7 @@ def ProcessCommand_config( configArgs ):
 		ProcessCommand_help( "config" )
 		sys.exit( -2 )
 	
-	if configArgs[0] == "list":
+	if configArgs[0] == "--list":
 		for section, sectionDicts in gRepositories.items():
 			print( section )
 			for key, value in sectionDicts.items():
