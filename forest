@@ -270,8 +270,11 @@ def main( argv=None ):
 	if argv is None:
 		argv = sys.argv
 	
+	# Print help if there are no args.
+	if len(argv) == 1:
+		ProcessCommand_help()
 	# Set up options for the command line that we support.
-	if   "help"    == argv[1]:
+	elif "help"    == argv[1]:
 		ProcessCommand_help( argv[2:] )
 	elif "init"    == argv[1]:
 		ProcessCommand_init( argv[2:] )
