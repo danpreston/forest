@@ -10,10 +10,11 @@
 from __future__ import with_statement
 import sys, commands, os
 
-kToolName		= "forest"
-kVersion		= " 1.0"
+kToolName			= "forest"
+kVersion			= " 1.0"
+kSpecialSections	= ["global", "alias"]
 
-gRepositories	= {}
+gForestConfig		= {}
 
 #----------------------------------------------------------------------------------------------------------------------------
 # ReadConfigFile
@@ -21,28 +22,29 @@ gRepositories	= {}
 
 def	ReadConfigFile( config = ".forest/forest.conf" ):
 	section = "global"
-	with open( config, 'r' ) as f:
-		lmark = '[project "'
-		rmark = '"]'
+	if os.path.exists( config ):
+		with open( config, 'r' ) as f:
+			lmark = '[project "'
+			rmark = '"]'
 		
-		for line in f:
-			line = line.strip()
-			if line.startswith( lmark ) and line.endswith( rmark ):
-				section = line[len(lmark):-len(rmark)]
-				gRepositories[section] = {}
-			elif line.startswith("#"):
-				continue
-			elif line.startswith( ";" ):
-				continue
-			elif line == "":
-				continue
-			else:
-				key, _, value = line.partition("=")
-				if value == None:
-					sys.exit(-2)
-				key = key.strip()
-				value = value.strip()
-				gRepositories[section][key] = value
+			for line in f:
+				line = line.strip()
+				if line.startswith( lmark ) and line.endswith( rmark ):
+					section = line[len(lmark):-len(rmark)]
+					gForestConfig[section] = {}
+				elif line.startswith("#"):
+					continue
+				elif line.startswith( ";" ):
+					continue
+				elif line == "":
+					continue
+				else:
+					key, _, value = line.partition("=")
+					if value == None:
+						sys.exit(-2)
+					key = key.strip()
+					value = value.strip()
+					gForestConfig[section][key] = value
 
 #----------------------------------------------------------------------------------------------------------------------------
 #	urlForSection
@@ -50,13 +52,13 @@ def	ReadConfigFile( config = ".forest/forest.conf" ):
 
 def urlForSection( section ):
 	user = None
-	if "user" in gRepositories[section]:
-		user = gRepositories["user"]
-	elif "global" in gRepositories and "user" in gRepositories["global"]:
-		user = gRepositories["global"]["user"]
+	if "user" in gForestConfig[section]:
+		user = gForestConfig["user"]
+	elif "global" in gForestConfig and "user" in gForestConfig["global"]:
+		user = gForestConfig["global"]["user"]
 
 	# inject the user name into the url.
-	url = gRepositories[section]["url"]
+	url = gForestConfig[section]["url"]
 	if user:
 		left, seperator, address = url.partition("://")
 		if seperator and url.find("@") == -1:
@@ -121,16 +123,16 @@ def ProcessCommand_config( configArgs ):
 		sys.exit( -2 )
 	
 	if configArgs[0] == "--list":
-		for section, sectionDicts in gRepositories.items():
+		for section, sectionDicts in gForestConfig.items():
 			print( section )
 			for key, value in sectionDicts.items():
 				print( "        %s = %s" % (key, value) )
 	
 	section, _, key = configArgs[0].partition(".")
 	if nargs == 1:
-		if section in gRepositories:
-			if key in gRepositories[section]:
-				print( gRepositories[section][key] )
+		if section in gForestConfig:
+			if key in gForestConfig[section]:
+				print( gForestConfig[section][key] )
 	elif nargs == 2:
 		sectionLine = '[project "%s"]\n' % section
 		keyLine = '        %s = %s\n' % (key, configArgs[1])
@@ -177,8 +179,8 @@ def ProcessCommand_foreach( forEachArgs ):
 		name = forEachArgs[0]
 		command = forEachArgs[0]
 	
-	for sectionName, section in gRepositories.items():
-		if sectionName != "global":
+	for sectionName, section in gForestConfig.items():
+		if not sectionName in kSpecialSections:
 			path = section["path"]
 			print( '"%s" at path: "%s"' % (name, path) )
 			current = os.getcwd()
@@ -225,7 +227,7 @@ def	ProcessCommand_pull( pullArgs ):
 	ReadConfigFile()
 	
 	fullPath = None
-	for sectionName, section in gRepositories.items():
+	for sectionName, section in gForestConfig.items():
 		if "path" in section:
 			path = section["path"]
 			if path == None:
@@ -269,6 +271,20 @@ def ProcessCommand_error( errorArgs ):
 def main( argv=None ):
 	if argv is None:
 		argv = sys.argv
+	
+	ReadConfigFile()
+	
+	# alias substitution.
+	if ("alias" in gForestConfig) and (len( argv ) > 1):
+		command = argv[1]
+		if command in gForestConfig["alias"]:
+			print( "Found it:" + command )
+			aliasArgs = gForestConfig["alias"][command].split()
+			argv[1] = aliasArgs[0]
+			if len( aliasArgs[1:] ) > 0:
+				# insert our aliased args inline into argv.
+				argv[2:2] = aliasArgs[1:]
+			print( argv )
 	
 	# Print help if there are no args.
 	if len(argv) == 1:
