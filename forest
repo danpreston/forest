@@ -45,6 +45,26 @@ def	ReadConfigFile( config = ".forest/forest.conf" ):
 				gRepositories[section][key] = value
 
 #----------------------------------------------------------------------------------------------------------------------------
+#	urlForSection
+#----------------------------------------------------------------------------------------------------------------------------
+
+def urlForSection( section ):
+	user = None
+	if "user" in gRepositories[section]:
+		user = gRepositories["user"]
+	elif "global" in gRepositories and "user" in gRepositories["global"]:
+		user = gRepositories["global"]["user"]
+
+	# inject the user name into the url.
+	url = gRepositories[section]["url"]
+	if user:
+		left, seperator, address = url.partition("://")
+		if seperator and url.find("@") == -1:
+			url = left + seperator + user + "@" + address
+
+	return url
+
+#----------------------------------------------------------------------------------------------------------------------------
 # ProcessCommand_help
 #----------------------------------------------------------------------------------------------------------------------------
 
@@ -131,7 +151,49 @@ def ProcessCommand_config( configArgs ):
 		with open( ".forest/forest.conf", "w" ) as f:
 			f.writelines( lines )
 			f.flush()
+
+#----------------------------------------------------------------------------------------------------------------------------
+#	ProcessCommand_foreach
+#----------------------------------------------------------------------------------------------------------------------------
+
+def ProcessCommand_foreach( forEachArgs ):
+	ReadConfigFile()
 	
+	nargs = len( forEachArgs )
+	if (nargs < 1) or (nargs > 2):
+		ProcessCommand_help( "foreach" )
+		sys.exit(-2)
+	
+	command = None
+	name = None
+	if (nargs == 2) and (forEachArgs[0] == "-f"):
+		if not os.path.exists( forEachArgs[1] ):
+			print( 'Script file "%s" doesn\'t exist!' % forEachArgs[1] )
+			sys.exit( -2 )
+		
+		name = forEachArgs[1]
+		command = os.path.abspath( forEachArgs[1] )
+	else:
+		name = forEachArgs[0]
+		command = forEachArgs[0]
+	
+	for sectionName, section in gRepositories.items():
+		if sectionName != "global":
+			path = section["path"]
+			print( '"%s" at path: "%s"' % (name, path) )
+			current = os.getcwd()
+			os.chdir(path)
+			output = commands.getoutput( command )
+			print( output + "\n" )
+			os.chdir(current)
+
+#----------------------------------------------------------------------------------------------------------------------------
+# ProcessCommand_status
+#----------------------------------------------------------------------------------------------------------------------------
+
+def ProcessCommand_status( statusArgs ):
+	ProcessCommand_foreach( ["git status"] )
+
 #----------------------------------------------------------------------------------------------------------------------------
 # ProcessCommand_pull
 #----------------------------------------------------------------------------------------------------------------------------
@@ -169,26 +231,6 @@ def	ProcessCommand_pull( pullArgs ):
 				os.chdir( ".." )
 
 #----------------------------------------------------------------------------------------------------------------------------
-#	urlForSection
-#----------------------------------------------------------------------------------------------------------------------------
-
-def urlForSection( section ):
-	user = None
-	if "user" in gRepositories[section]:
-		user = gRepositories["user"]
-	elif "global" in gRepositories and "user" in gRepositories["global"]:
-		user = gRepositories["global"]["user"]
-	
-	# inject the user name into the url.
-	url = gRepositories[section]["url"]
-	if user:
-		left, seperator, address = url.partition("://")
-		if seperator and url.find("@") == -1:
-			url = left + seperator + user + "@" + address
-	
-	return url
-
-#----------------------------------------------------------------------------------------------------------------------------
 #	ProcessCommand_error
 #----------------------------------------------------------------------------------------------------------------------------
 
@@ -206,19 +248,21 @@ def main( argv=None ):
 		argv = sys.argv
 	
 	# Set up options for the command line that we support.
-	if   "help"   == argv[1]:
+	if   "help"    == argv[1]:
 		ProcessCommand_help( argv[2:] )
-	elif "init"   == argv[1]:
+	elif "init"    == argv[1]:
 		ProcessCommand_init( argv[2:] )
-	elif "config" == argv[1]:
+	elif "config"  == argv[1]:
 		ProcessCommand_config( argv[2:] )
-	elif "pull"   == argv[1]:
+	elif "foreach" == argv[1]:
+		ProcessCommand_foreach( argv[2:] )
+	elif "pull"    == argv[1]:
 		ProcessCommand_pull( argv[2:] )
-	elif "push"   == argv[1]:
+	elif "push"    == argv[1]:
 		ProcessCommand_push( argv[2:] )
-	elif "stat"   == argv[1]:
-		ProcessCommand_stat( argv[2:] )
-	elif "tag"    == argv[1]:
+	elif "status"  == argv[1]:
+		ProcessCommand_status( argv[2:] )
+	elif "tag"     == argv[1]:
 		ProcessCommand_tag( argv[2:] )
 	else:
 		ProcessCommand_error( argv[1:] )
