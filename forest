@@ -62,6 +62,9 @@ def LocateBaseDir():
 		if found == False:
 			current, tail = os.path.split( current )
 	
+	if not found:
+		current = None
+	
 	return current
 	
 #----------------------------------------------------------------------------------------------------------------------------
@@ -291,8 +294,11 @@ def main( argv=None ):
 		argv = sys.argv
 	
 	baseDir = LocateBaseDir()
-	os.chdir( baseDir )
+	if baseDir == None:
+		print( "fatal: Not a forest repository (or any of the parent directories):" )
+		sys.exit( -2 )
 	
+	os.chdir( baseDir )
 	ReadConfigFile()
 	
 	# alias substitution.
