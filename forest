@@ -295,7 +295,7 @@ def main( argv=None ):
 	
 	baseDir = LocateBaseDir()
 	if baseDir == None:
-		print( "fatal: Not a forest repository (or any of the parent directories):" )
+		print( "fatal: Not in a forest repository." )
 		sys.exit( -2 )
 	
 	os.chdir( baseDir )
