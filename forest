@@ -47,10 +47,28 @@ def	ReadConfigFile( config = ".forest/forest.conf" ):
 					gForestConfig[section][key] = value
 
 #----------------------------------------------------------------------------------------------------------------------------
-#	urlForSection
+# LocateBaseDir
 #----------------------------------------------------------------------------------------------------------------------------
 
-def urlForSection( section ):
+def LocateBaseDir():
+	current = os.getcwd()
+	
+	found = False;
+	forestPath = None
+	# Figure out what the relative path of the file is from the .git folder.
+	while ( found == False ) and ( current != "/" ):
+		forestPath = os.path.join( current, ".forest/forest.conf" )
+		found = os.path.exists( forestPath )
+		if found == False:
+			current, tail = os.path.split( current )
+	
+	return current
+	
+#----------------------------------------------------------------------------------------------------------------------------
+#	URLForSection
+#----------------------------------------------------------------------------------------------------------------------------
+
+def URLForSection( section ):
 	user = None
 	if "user" in gForestConfig[section]:
 		user = gForestConfig["user"]
@@ -237,7 +255,7 @@ def	ProcessCommand_pull( pullArgs ):
 			
 			# clone the path if we don't have it yet, otherwise just pull.
 			if os.path.exists( fullpath ) == False:
-				url = urlForSection( sectionName )
+				url = URLForSection( sectionName )
 				print( "Cloning '%s' -> '%s'..." % (url, path) )
 				command = "git clone %s %s 2>&1" % (url, path)
 				err, output = commands.getstatusoutput( command )
@@ -271,6 +289,9 @@ def ProcessCommand_error( errorArgs ):
 def main( argv=None ):
 	if argv is None:
 		argv = sys.argv
+	
+	baseDir = LocateBaseDir()
+	os.chdir( baseDir )
 	
 	ReadConfigFile()
 	
